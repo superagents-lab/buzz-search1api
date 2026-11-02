@@ -1,0 +1,21 @@
+{
+  "id": "search1api.buzz",
+  "name": "Search1API",
+  "apiVersion": 1,
+  "description": "Live web search, news and page reading for your agents, with your own Search1API key.",
+  "discovery": {
+    "category": "agent-tools",
+    "tags": ["Web search", "News", "Web crawling", "Search1API"]
+  },
+  "host": {
+    "commands": [
+      { "id": "keychain-read", "program": "security", "args": ["find-generic-password", "-s", "buzz-search1api", "-a", "search1api", "-w"] },
+      { "id": "keychain-save", "program": "security", "args": ["add-generic-password", "-U", "-s", "buzz-search1api", "-a", "search1api", "-w"], "maxInputBytes": 2048 },
+      { "id": "keychain-delete", "program": "security", "args": ["delete-generic-password", "-s", "buzz-search1api", "-a", "search1api"] },
+      { "id": "secret-read", "program": "secret-tool", "args": ["lookup", "service", "buzz-search1api", "account", "search1api"] },
+      { "id": "secret-save", "program": "secret-tool", "args": ["store", "--label=Search1API key (Buzz)", "service", "buzz-search1api", "account", "search1api"], "maxInputBytes": 2048 },
+      { "id": "secret-delete", "program": "secret-tool", "args": ["clear", "service", "buzz-search1api", "account", "search1api"] }
+    ],
+    "networkOrigins": ["https://api.search1api.com"]
+  }
+}

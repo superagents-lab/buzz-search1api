@@ -1,0 +1,7 @@
+Search1API plugin for Buzz
+Copyright 2026 SuperAgents, LLC
+
+This product includes software adapted from buzz-plugins
+(https://github.com/0xnfrith/buzz-plugins), licensed under the Apache License 2.0:
+src/keys.ts, parts of src/settings.tsx, test/host-sim.mjs, test/fake-security,
+test/fake-secret-tool, and test/unit/{keys,keychain,secretservice}.test.ts.
