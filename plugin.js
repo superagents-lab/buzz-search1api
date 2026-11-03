@@ -1,7 +1,7 @@
 // src/client.ts
 var S1_ORIGIN = "https://api.search1api.com";
 /** Tells Search1API which integration a request came from. */
-var USER_AGENT = `search1api-buzz/0.2.0`;
+var USER_AGENT = `search1api-buzz/0.3.0`;
 var S1Error = class extends Error {
 	kind;
 	constructor(kind, message) {
@@ -453,7 +453,7 @@ function createSettingsCard({ keys, client }) {
 		return /* @__PURE__ */ React.createElement("section", {
 			className: "s1b-root",
 			"aria-label": "Search1API"
-		}, /* @__PURE__ */ React.createElement("p", null, "Gives every agent in this app Search1API tools: ", /* @__PURE__ */ React.createElement("code", null, "search1api_search"), " to search the live web,", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_news"), " for recent news, ", /* @__PURE__ */ React.createElement("code", null, "search1api_crawl"), " to read a page in full, and", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_maps"), " to find places and businesses on Google Maps. They use your own Search1API key, which is kept on this computer and sent only to Search1API."), saved && !replacing && /* @__PURE__ */ React.createElement("p", {
+		}, /* @__PURE__ */ React.createElement("p", null, "Gives every agent in this app Search1API tools: ", /* @__PURE__ */ React.createElement("code", null, "search1api_search"), " to search the live web,", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_news"), " for recent news, ", /* @__PURE__ */ React.createElement("code", null, "search1api_crawl"), " to read a page in full, and", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_maps"), " to find places and businesses on Google Maps. With", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_render_results"), " they can show what they found as cards in their reply. The tools use your own Search1API key, which is kept on this computer and sent only to Search1API."), saved && !replacing && /* @__PURE__ */ React.createElement("p", {
 			className: "s1b-saved",
 			"data-place": place
 		}, /* @__PURE__ */ React.createElement("strong", null, "Key saved."), " ", place === "keychain" || place === "secret-service" ? `It is kept in ${STORE_NAME[place]}. It is not shown again.` : store ? `It is in this app's profile, as plain text, because ${store === "keychain" ? "the Keychain" : "the system secret store (Secret Service)"} would not take it yet (it is tried again each time Buzz starts). Any other plugin you install could read it. It is not shown again.` : "It is in this app's profile, as plain text, because this system has no secret store the plugin can use: any other plugin you install could read it. It is not shown again."), showInput && /* @__PURE__ */ React.createElement("form", {
@@ -550,6 +550,28 @@ var CSS = `
   overflow-x: auto; white-space: pre; }
 .s1b-root [data-tone="error"] { color: var(--red-11, #ff6369); }
 .s1b-root [data-tone="ok"] { color: var(--green-11, #3dd68c); }
+
+/* result cards, drawn in place of a search1api-results code block */
+.s1b-results { gap: 8px; max-width: 760px; }
+.s1b-results-title { font-weight: 600; }
+.s1b-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.s1b-card { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 12px; border: 1px solid var(--s1b-line);
+  border-radius: 8px; background: var(--s1b-card); }
+.s1b-card:hover { border-color: color-mix(in srgb, var(--s1b-accent) 45%, var(--s1b-line)); }
+.s1b-card-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.s1b-index { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 9px; background: color-mix(in srgb, var(--s1b-accent) 16%, transparent); color: var(--s1b-accent); font-size: 11px; font-weight: 600; }
+.s1b-root .s1b-title { color: var(--s1b-ink); font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; }
+.s1b-root .s1b-title:hover { color: var(--s1b-accent); }
+.s1b-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; font-size: 12.5px; }
+.s1b-site { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.s1b-dim { color: var(--s1b-muted); }
+.s1b-rating { color: var(--s1b-ink); }
+.s1b-rating [aria-hidden] { color: var(--amber-9, #f5a524); }
+.s1b-text { margin: 0; font-size: 12.5px; color: var(--s1b-muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.s1b-links a { font-weight: 500; }
+.s1b-results-foot { font-size: 11.5px; }
 `;
 // src/tools.ts
 /** Longest page text handed to an agent from one read, in characters. */
@@ -887,6 +909,216 @@ function createTools(client) {
 		}
 	];
 }
+// src/render.ts
+var BLOCK_LANGUAGE = "search1api-results";
+var MAX_TITLE = 300;
+var MAX_TEXT = 400;
+var MAX_HEADING = 120;
+var STRING_META = [
+	"published_date",
+	"source",
+	"category",
+	"address",
+	"open_state",
+	"phone",
+	"price"
+];
+/** An http(s) address without credentials, or nothing. */
+function safeUrl(value) {
+	if (typeof value !== "string" || value.length > 2048) return void 0;
+	let url;
+	try {
+		url = new URL(value);
+	} catch {
+		return;
+	}
+	if (url.protocol !== "https:" && url.protocol !== "http:" || url.username || url.password) return void 0;
+	return url.toString();
+}
+var clean = (value, max) => {
+	if (typeof value !== "string") return void 0;
+	const text = value.replace(/\s+/g, " ").trim();
+	if (!text) return void 0;
+	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+};
+/** One card from what an agent passed, or from a block read back; `undefined` when it has no title or usable link. */
+function toCard(raw) {
+	if (!raw || typeof raw !== "object") return void 0;
+	const item = raw;
+	const title = clean(item.title ?? item.name, MAX_TITLE);
+	const url = safeUrl(item.url ?? item.maps_url);
+	if (!title || !url) return void 0;
+	const meta = {
+		...item.metadata && typeof item.metadata === "object" ? item.metadata : {},
+		...item
+	};
+	const card = {
+		title,
+		url
+	};
+	const text = clean(item.text ?? item.snippet ?? item.description, MAX_TEXT);
+	if (text) card.text = text;
+	for (const key of STRING_META) {
+		const value = clean(meta[key], 200);
+		if (value) card[key] = value;
+	}
+	if (typeof meta.rating === "number" && Number.isFinite(meta.rating) && meta.rating >= 0 && meta.rating <= 5) card.rating = meta.rating;
+	if (typeof meta.review_count === "number" && Number.isInteger(meta.review_count) && meta.review_count >= 0) card.review_count = meta.review_count;
+	const website = safeUrl(meta.website);
+	if (website) card.website = website;
+	return card;
+}
+/** Reads a block back. Throws on anything that is not one, so Buzz shows the plain block instead. */
+function parseBlock(code) {
+	const data = JSON.parse(code);
+	if (!data || typeof data !== "object" || data.v !== 1 || !Array.isArray(data.results)) throw new Error("Not a Search1API results block");
+	const results = data.results.slice(0, 50).map(toCard).filter((card) => card !== void 0);
+	if (results.length === 0) throw new Error("No results to show");
+	const title = clean(data.title, MAX_HEADING);
+	return {
+		v: 1,
+		...title ? { title } : {},
+		results
+	};
+}
+function buildBlock(cards) {
+	return `\`\`\`${BLOCK_LANGUAGE}\n${JSON.stringify(cards, null, 1)}\n\`\`\``;
+}
+function createRenderTool() {
+	return {
+		name: "search1api_render_results",
+		description: "Show results you already have from search1api_search, search1api_news or search1api_maps as cards in your Buzz reply. Pass them in the order to show; never invent titles or links. It returns a fenced code block: put that block in your message exactly as given, where the cards should appear, and keep writing your answer around it. It does not search or fetch anything and costs no credits. Use it when the user wants to browse sources or a list of places; skip it when a plain answer is enough.",
+		inputSchema: {
+			type: "object",
+			properties: {
+				title: {
+					type: "string",
+					maxLength: MAX_HEADING,
+					description: "Heading above the cards, such as the topic"
+				},
+				results: {
+					type: "array",
+					minItems: 1,
+					maxItems: 50,
+					description: "Results as the Search1API tools returned them, in display order. Places from search1api_maps can be passed as they are.",
+					items: {
+						type: "object",
+						properties: {
+							title: {
+								type: "string",
+								description: "Title as returned (or `name` for a place)"
+							},
+							url: {
+								type: "string",
+								description: "Link as returned (or `maps_url` for a place)"
+							},
+							text: {
+								type: "string",
+								description: "The snippet, or a faithful excerpt; not your own summary"
+							},
+							published_date: { type: "string" },
+							rating: { type: "number" },
+							review_count: { type: "integer" },
+							category: { type: "string" },
+							address: { type: "string" },
+							open_state: { type: "string" },
+							phone: { type: "string" },
+							website: { type: "string" },
+							price: { type: "string" }
+						}
+					}
+				}
+			},
+			required: ["results"],
+			additionalProperties: false
+		},
+		async call(_client, _context, args) {
+			if (!Array.isArray(args.results) || args.results.length === 0) throw new Error("results must be a non-empty list of results you already have");
+			if (args.results.length > 50) throw new Error(`results can hold at most 50 items`);
+			const results = args.results.map(toCard).filter((card) => card !== void 0);
+			const dropped = args.results.length - results.length;
+			if (results.length === 0) throw new Error("None of the results had a title and an http(s) link");
+			const title = clean(args.title, MAX_HEADING);
+			const block = buildBlock({
+				v: 1,
+				...title ? { title } : {},
+				results
+			});
+			return [
+				`Put this block in your reply exactly as it is, where the cards should appear${dropped ? ` (${dropped} result${dropped === 1 ? "" : "s"} without a title or http(s) link left out)` : ""}:`,
+				"",
+				block
+			].join("\n");
+		}
+	};
+}
+// src/cards.tsx
+function host(url) {
+	try {
+		return new URL(url).hostname.replace(/^www\./, "");
+	} catch {
+		return url;
+	}
+}
+function date(value) {
+	if (!value) return void 0;
+	const parsed = new Date(value);
+	return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString(void 0, {
+		year: "numeric",
+		month: "short",
+		day: "numeric"
+	});
+}
+var isPlace = (card) => card.rating !== void 0 || card.review_count !== void 0 || card.address !== void 0 || card.open_state !== void 0;
+function Stars({ rating, reviews }) {
+	if (rating === void 0 && reviews === void 0) return null;
+	return /* @__PURE__ */ React.createElement("span", { className: "s1b-rating" }, rating !== void 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("span", { "aria-hidden": "true" }, "★"), " ", /* @__PURE__ */ React.createElement("strong", null, rating.toFixed(1))), reviews !== void 0 && /* @__PURE__ */ React.createElement("span", { className: "s1b-dim" }, " (", reviews.toLocaleString("en-US"), " reviews)"));
+}
+function PlaceCard({ card, index }) {
+	return /* @__PURE__ */ React.createElement("li", {
+		className: "s1b-card",
+		"data-kind": "place"
+	}, /* @__PURE__ */ React.createElement("div", { className: "s1b-card-head" }, /* @__PURE__ */ React.createElement("span", { className: "s1b-index" }, index + 1), /* @__PURE__ */ React.createElement("a", {
+		className: "s1b-title",
+		href: card.url,
+		target: "_blank",
+		rel: "noopener noreferrer"
+	}, card.title)), /* @__PURE__ */ React.createElement("div", { className: "s1b-line" }, /* @__PURE__ */ React.createElement(Stars, {
+		rating: card.rating,
+		reviews: card.review_count
+	}), card.category && /* @__PURE__ */ React.createElement("span", { className: "s1b-dim" }, card.category), card.price && /* @__PURE__ */ React.createElement("span", { className: "s1b-dim" }, card.price)), card.address && /* @__PURE__ */ React.createElement("div", { className: "s1b-line s1b-dim" }, card.address), card.open_state && /* @__PURE__ */ React.createElement("div", { className: "s1b-line s1b-dim" }, card.open_state), card.text && /* @__PURE__ */ React.createElement("p", { className: "s1b-text" }, card.text), (card.website || card.phone) && /* @__PURE__ */ React.createElement("div", { className: "s1b-line s1b-links" }, card.website && /* @__PURE__ */ React.createElement("a", {
+		href: card.website,
+		target: "_blank",
+		rel: "noopener noreferrer"
+	}, host(card.website)), card.phone && /* @__PURE__ */ React.createElement("span", { className: "s1b-dim" }, card.phone)));
+}
+function SourceCard({ card, index }) {
+	const when = date(card.published_date);
+	return /* @__PURE__ */ React.createElement("li", {
+		className: "s1b-card",
+		"data-kind": "source"
+	}, /* @__PURE__ */ React.createElement("div", { className: "s1b-line s1b-dim s1b-site" }, /* @__PURE__ */ React.createElement("span", { className: "s1b-index" }, index + 1), /* @__PURE__ */ React.createElement("span", null, card.source ?? host(card.url)), when && /* @__PURE__ */ React.createElement("span", null, "· ", when)), /* @__PURE__ */ React.createElement("a", {
+		className: "s1b-title",
+		href: card.url,
+		target: "_blank",
+		rel: "noopener noreferrer"
+	}, card.title), card.text && /* @__PURE__ */ React.createElement("p", { className: "s1b-text" }, card.text));
+}
+function ResultCards({ code }) {
+	const cards = React.useMemo(() => parseBlock(code), [code]);
+	return /* @__PURE__ */ React.createElement("section", {
+		className: "s1b-root s1b-results",
+		"aria-label": cards.title ?? "Search results"
+	}, cards.title && /* @__PURE__ */ React.createElement("div", { className: "s1b-results-title" }, cards.title), /* @__PURE__ */ React.createElement("ol", { className: "s1b-cards" }, cards.results.map((card, index) => isPlace(card) ? /* @__PURE__ */ React.createElement(PlaceCard, {
+		key: index,
+		card,
+		index
+	}) : /* @__PURE__ */ React.createElement(SourceCard, {
+		key: index,
+		card,
+		index
+	}))), /* @__PURE__ */ React.createElement("div", { className: "s1b-results-foot s1b-dim" }, cards.results.length, " result", cards.results.length === 1 ? "" : "s", " · via Search1API"));
+}
 // src/index.tsx
 var inject = [
 	"react",
@@ -911,7 +1143,15 @@ function apply(ctx) {
 		document.head.append(style);
 		return () => style.remove();
 	});
-	for (const tool of createTools(client)) ctx.agents.addTool(tool);
+	for (const tool of [...createTools(client), createRenderTool()]) ctx.agents.addTool(tool);
+	ctx.inject(["conversation"], (scope) => {
+		scope.conversation.registerCodeBlock({
+			id: "results",
+			title: "Search1API results",
+			matches: (language) => language.trim().toLowerCase() === BLOCK_LANGUAGE,
+			component: ResultCards
+		});
+	});
 	ctx.settingsCards.register({
 		id: "settings",
 		title: "Search1API",

@@ -168,7 +168,8 @@ export function createSettingsCard({ keys, client }: { keys: KeyStore; client: S
         <p>
           Gives every agent in this app Search1API tools: <code>search1api_search</code> to search the live web,{" "}
           <code>search1api_news</code> for recent news, <code>search1api_crawl</code> to read a page in full, and{" "}
-          <code>search1api_maps</code> to find places and businesses on Google Maps. They
+          <code>search1api_maps</code> to find places and businesses on Google Maps. With{" "}
+          <code>search1api_render_results</code> they can show what they found as cards in their reply. The tools
           use your own Search1API key, which is kept on this computer and sent only to Search1API.
         </p>
         {saved && !replacing && (

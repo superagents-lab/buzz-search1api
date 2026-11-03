@@ -49,12 +49,27 @@ export type SettingsCard = Readonly<{
   component: ReactNamespace.ComponentType<{ active(): boolean }>;
 }>;
 
+export type CodeBlockRenderer = Readonly<{
+  id: string;
+  title: string;
+  matches(language: string): boolean;
+  component: ReactNamespace.ComponentType<{ code: string; language: string }>;
+}>;
+
+export type Conversation = {
+  registerCodeBlock(renderer: CodeBlockRenderer): void;
+};
+
 export type Context = {
   react: typeof ReactNamespace;
   host: Host;
   agents: Agents;
   navigation: { open(target: { version: 1; kind: "settings"; section?: string }): Promise<unknown> };
   settingsCards: { register(card: SettingsCard): void };
+  /** Runs `callback` with a scope that has `deps` once they are all present, and again whenever they come back. */
+  inject(deps: string[], callback: (scope: Context) => void): void;
+  /** Present only inside an `inject(["conversation"], ...)` scope. */
+  conversation: Conversation;
   /** Runs `setup` now and its returned cleanup when the plugin's scope ends. */
   effect(setup: () => () => void): void;
 };
