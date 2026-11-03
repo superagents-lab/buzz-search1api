@@ -17,7 +17,10 @@ Give every agent in Buzz live web search, news, full-page reading and Google Map
 | `search1api_search` | Searches the live web. Agents can pick a source (Google by default, or Bing, GitHub, Reddit, YouTube, WeChat and more), scope it to sites or a recent time window, and read the top results in full. | 1, plus 1 per result read in full |
 | `search1api_news` | Searches recent news, or Hacker News discussions. | 1 |
 | `search1api_crawl` | Reads one page and returns its main content as text. | 1 |
+| `search1api_render_results` | Shows results the agent already has as cards in its reply: sources with site, date and snippet, or places with rating, reviews, address and website. Nothing is searched again. | 0 |
 | `search1api_maps` | Finds businesses and places on Google Maps: name, map link, address, phone, website, rating, reviews, coordinates and opening hours. Agents can search around a point and page through up to 6 pages. | 3 per page of up to 20 places |
+
+Ask for cards in plain words, such as "show them as cards". The agent gets a `search1api-results` code block from `search1api_render_results` and puts it in its reply; this plugin draws that block as cards. People in the conversation who do not have the plugin see the block as plain JSON.
 
 Buzz adds the tools to every agent session in the app (Claude, Codex, Goose and Pi agents), and agents load them when they need them.
 

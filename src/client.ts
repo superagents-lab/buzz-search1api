@@ -1,7 +1,7 @@
 import type { HostRequest, HostResponse } from "./buzz";
 
 export const S1_ORIGIN = "https://api.search1api.com";
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 /** Tells Search1API which integration a request came from. */
 export const USER_AGENT = `search1api-buzz/${VERSION}`;
 

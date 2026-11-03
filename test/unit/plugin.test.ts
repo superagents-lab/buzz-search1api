@@ -3,7 +3,7 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, test } from "vitest";
-import type { AddedTool, HostRequest, SettingsCard } from "../../src/buzz";
+import type { AddedTool, CodeBlockRenderer, HostRequest, SettingsCard } from "../../src/buzz";
 import { GOOD_KEY, createFakeS1, memoryStorage } from "./fake";
 
 type Loaded = { inject: string[]; apply(ctx: unknown): void };
@@ -14,7 +14,8 @@ function loadContext() {
   const cards: SettingsCard[] = [];
   const cleanups: (() => void)[] = [];
   const requests: HostRequest[] = [];
-  const ctx = {
+  const blocks: CodeBlockRenderer[] = [];
+  const ctx: Record<string, unknown> = {
     react: React,
     host: {
       request: (request: HostRequest) => {
@@ -27,11 +28,14 @@ function loadContext() {
       runCommand: async () => null,
     },
     agents: { addTool: (tool: AddedTool) => tools.push(tool) },
+    inject: (deps: string[], callback: (scope: unknown) => void) => {
+      if (deps.join() === "conversation") callback({ ...ctx, conversation: { registerCodeBlock: (r: CodeBlockRenderer) => blocks.push(r) } });
+    },
     settingsCards: { register: (card: SettingsCard) => cards.push(card) },
     navigation: { open: async () => undefined },
     effect: (setup: () => () => void) => cleanups.push(setup()),
   };
-  return { ctx, fake, tools, cards, cleanups, requests };
+  return { ctx, fake, tools, cards, cleanups, requests, blocks };
 }
 
 let plugin: Loaded;
@@ -60,9 +64,21 @@ describe("the built plugin.js", () => {
   test("apply adds the tools and the settings card, and a style that its cleanup removes", () => {
     const { ctx, tools, cards, cleanups } = loadContext();
     plugin.apply(ctx);
-    expect(tools.map((t) => t.name)).toEqual(["search1api_search", "search1api_news", "search1api_crawl", "search1api_maps"]);
+    expect(tools.map((t) => t.name)).toEqual(["search1api_search", "search1api_news", "search1api_crawl", "search1api_maps", "search1api_render_results"]);
     expect(cards.map((c) => [c.id, c.title, c.group])).toEqual([["settings", "Search1API", "Plugins"]]);
     expect(cleanups).toHaveLength(1);
+  });
+
+  test("draws search1api-results code blocks as cards through the conversation service", () => {
+    const { ctx, blocks } = loadContext();
+    plugin.apply(ctx);
+    expect(blocks.map((b) => b.id)).toEqual(["results"]);
+    expect(blocks[0]!.matches("search1api-results")).toBe(true);
+    expect(blocks[0]!.matches("json")).toBe(false);
+    const html = renderToStaticMarkup(
+      React.createElement(blocks[0]!.component, { code: '{"v":1,"results":[{"title":"T","url":"https://e.com"}]}', language: "search1api-results" }),
+    );
+    expect(html).toContain("via Search1API");
   });
 
   test("the settings card renders, asking for a key, with where to get one", () => {
