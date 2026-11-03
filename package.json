@@ -1,6 +1,6 @@
 {
   "name": "buzz-search1api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Search1API plugin for Buzz: web search, news and page reading for every agent in the app.",

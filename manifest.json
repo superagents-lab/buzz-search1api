@@ -2,10 +2,10 @@
   "id": "search1api.buzz",
   "name": "Search1API",
   "apiVersion": 1,
-  "description": "Live web search, news and page reading for your agents, with your own Search1API key.",
+  "description": "Live web search, news, page reading and Google Maps places for your agents, with your own Search1API key.",
   "discovery": {
     "category": "agent-tools",
-    "tags": ["Web search", "News", "Web crawling", "Search1API"]
+    "tags": ["Web search", "News", "Web crawling", "Maps", "Search1API"]
   },
   "host": {
     "commands": [

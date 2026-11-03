@@ -1,12 +1,12 @@
 # Search1API
 
-Give every agent in Buzz live web search, news search and full-page reading, with your own Search1API key. Agents answer from current sources and cite the links they used.
+Give every agent in Buzz live web search, news, full-page reading and Google Maps places, with your own Search1API key. Agents answer from current sources and cite the links they used.
 
 ## Getting started
 
 1. In the Buzz desktop app, open **Settings → Plugins → Manage plugins**, choose **Add**, enter `superagents-lab/buzz-search1api` and choose **Find**. Pick **Search1API**, review what it asks for, and choose **Install plugin**.
 2. Open **Settings → Plugins → Search1API**, paste your API key and choose **Save key**. No key yet? [Get one at app.s1.dev](https://app.s1.dev/?utm_source=buzz&utm_medium=plugin) and start with 100 free credits, no credit card required.
-3. Mention an agent and ask about something current, such as "@researcher what changed in the latest Next.js release? Cite your sources."
+3. Mention an agent and ask about something current, such as "@researcher what changed in the latest Next.js release? Cite your sources." or "@scout list ten specialty coffee shops in Austin with ratings and websites."
 
 ---
 
@@ -17,6 +17,7 @@ Give every agent in Buzz live web search, news search and full-page reading, wit
 | `search1api_search` | Searches the live web. Agents can pick a source (Google by default, or Bing, GitHub, Reddit, YouTube, WeChat and more), scope it to sites or a recent time window, and read the top results in full. | 1, plus 1 per result read in full |
 | `search1api_news` | Searches recent news, or Hacker News discussions. | 1 |
 | `search1api_crawl` | Reads one page and returns its main content as text. | 1 |
+| `search1api_maps` | Finds businesses and places on Google Maps: name, map link, address, phone, website, rating, reviews, coordinates and opening hours. Agents can search around a point and page through up to 6 pages. | 3 per page of up to 20 places |
 
 Buzz adds the tools to every agent session in the app (Claude, Codex, Goose and Pi agents), and agents load them when they need them.
 

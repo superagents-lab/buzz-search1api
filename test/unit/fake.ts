@@ -53,6 +53,17 @@ export function createFakeS1() {
         })),
       });
     }
+    if (url.pathname === "/maps" && request.method === "POST") {
+      if ((body.page ?? 1) > 1 && !body.location)
+        return json(422, { error: "Unprocessable Entity", message: "location is required when page is greater than 1" });
+      return json(200, {
+        searchParameters: { country: "us", language: "en", page: 1, max_results: 20, ...body },
+        results: [
+          { position: 1, name: "Fake Coffee", place_id: "p1", maps_url: "https://www.google.com/maps/place/?q=place_id:p1", rating: 4.6, review_count: 120, address: "1 Main St" },
+          { position: 2, name: "No link", place_id: "p2" },
+        ],
+      });
+    }
     if (url.pathname === "/crawl" && request.method === "POST")
       return json(200, { crawlParameters: body, results: { title: "A page", link: body.url, content: page } });
     return json(404, { error: "Not Found", message: "Not Found" });

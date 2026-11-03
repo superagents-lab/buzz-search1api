@@ -24,6 +24,7 @@ type RawResult = {
   published_date?: unknown;
 };
 type SearchBody = { results?: RawResult[] };
+type MapsBody = { results?: Record<string, unknown>[] };
 type CrawlBody = { results?: { title?: unknown; link?: unknown; content?: unknown } };
 
 const text = (value: unknown) => (typeof value === "string" ? value : undefined);
@@ -90,6 +91,15 @@ function requireHttpUrl(args: Record<string, unknown>, name: string): string {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(`${name} must start with http:// or https://`);
   return url.toString();
+}
+
+function optionalLocation(value: unknown): { latitude: number; longitude: number; zoom?: number } | undefined {
+  if (value === undefined || value === null) return undefined;
+  const v = value as Record<string, unknown>;
+  const number = (n: unknown, min: number, max: number) => typeof n === "number" && Number.isFinite(n) && n >= min && n <= max;
+  if (typeof value !== "object" || !number(v.latitude, -90, 90) || !number(v.longitude, -180, 180) || (v.zoom !== undefined && !number(v.zoom, 3, 30)))
+    throw new Error("location must be {latitude: -90..90, longitude: -180..180, zoom?: 3..30}");
+  return defined({ latitude: v.latitude, longitude: v.longitude, zoom: v.zoom }) as { latitude: number; longitude: number; zoom?: number };
 }
 
 const defined = (entries: Record<string, unknown>) =>
@@ -192,5 +202,59 @@ export function createTools(client: S1Client): AddedTool[] {
     },
   };
 
-  return [search, news, crawl];
+  const maps: AddedTool = {
+    name: "search1api_maps",
+    description:
+      "Find local businesses and places on Google Maps with Search1API, when the user asks where something is, wants nearby options, or needs a list of businesses with contact details. Returns JSON with one page of up to 20 places: name and Google Maps link, plus address, phone, website, category, rating, review count, coordinates and opening hours when known. Costs 3 credits per page however many places it holds. Use search1api_search for web pages and search1api_crawl to read a business's website.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", maxLength: 1000, description: 'What to look for, such as "coffee shops" or "dentists in Austin"; a place name in the query sets the area when no location is given' },
+        country: { type: "string", pattern: "^[a-zA-Z]{2}$", description: "Two-letter country code for local results; default us" },
+        language: { type: "string", description: "Result language, such as en, de or zh-CN; default en" },
+        location: {
+          type: "object",
+          description: "Search around this point instead of letting the query decide the area; required for page 2 and later",
+          properties: {
+            latitude: { type: "number", minimum: -90, maximum: 90 },
+            longitude: { type: "number", minimum: -180, maximum: 180 },
+            zoom: { type: "number", minimum: 3, maximum: 30, description: "Map zoom, higher is a smaller area; default 14" },
+          },
+          required: ["latitude", "longitude"],
+          additionalProperties: false,
+        },
+        page: { type: "integer", minimum: 1, maximum: 6, description: "Page to fetch; each page is a separate 3-credit call and pages after the first need location" },
+        max_results: { type: "integer", minimum: 1, maximum: 20, description: "How many places the answer needs; fewer places do not lower the price" },
+      },
+      required: ["query"],
+      additionalProperties: false,
+    },
+    async call(_client, _context, args) {
+      const country = args.country;
+      if (country !== undefined && (typeof country !== "string" || !/^[a-zA-Z]{2}$/.test(country)))
+        throw new Error("country must be a two-letter country code, such as us or de");
+      const language = args.language;
+      if (language !== undefined && (typeof language !== "string" || !/^[a-z]{2,3}(-[a-zA-Z]{2,4})?$/.test(language)))
+        throw new Error("language must be a language code, such as en, de or zh-CN");
+      const location = optionalLocation(args.location);
+      const page = optionalInt(args, "page", 1, 6);
+      if (page !== undefined && page > 1 && !location) throw new Error("location is required for page 2 and later");
+      const request = defined({
+        query: requireString(args, "query"),
+        country,
+        language,
+        location,
+        page,
+        max_results: optionalInt(args, "max_results", 1, 20),
+      });
+      const body = await client.post<MapsBody>("/maps", request, 45_000);
+      const places = (body.results ?? [])
+        .filter((place) => typeof place.name === "string" && typeof place.maps_url === "string")
+        // The photo link is long and tells the agent nothing it can use.
+        .map(({ thumbnail: _thumbnail, ...place }) => place);
+      return JSON.stringify({ query: request.query, places }, null, 1);
+    },
+  };
+
+  return [search, news, crawl, maps];
 }

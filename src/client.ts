@@ -1,7 +1,7 @@
 import type { HostRequest, HostResponse } from "./buzz";
 
 export const S1_ORIGIN = "https://api.search1api.com";
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 /** Tells Search1API which integration a request came from. */
 export const USER_AGENT = `search1api-buzz/${VERSION}`;
 
@@ -78,7 +78,7 @@ export function createClient(
       const body = await call<{ usage?: unknown }>("/usage", { method: "GET" }, candidate);
       return { credits: typeof body.usage === "number" && Number.isFinite(body.usage) ? body.usage : null };
     },
-    post: <T>(path: "/search" | "/news" | "/crawl", body: Record<string, unknown>, timeoutMs?: number) =>
+    post: <T>(path: "/search" | "/news" | "/crawl" | "/maps", body: Record<string, unknown>, timeoutMs?: number) =>
       call<T>(path, { method: "POST", body, ...(timeoutMs ? { timeoutMs } : {}) }),
   };
 }

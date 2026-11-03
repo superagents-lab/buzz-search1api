@@ -167,7 +167,8 @@ export function createSettingsCard({ keys, client }: { keys: KeyStore; client: S
       <section className="s1b-root" aria-label="Search1API">
         <p>
           Gives every agent in this app Search1API tools: <code>search1api_search</code> to search the live web,{" "}
-          <code>search1api_news</code> for recent news, and <code>search1api_crawl</code> to read a page in full. They
+          <code>search1api_news</code> for recent news, <code>search1api_crawl</code> to read a page in full, and{" "}
+          <code>search1api_maps</code> to find places and businesses on Google Maps. They
           use your own Search1API key, which is kept on this computer and sent only to Search1API.
         </p>
         {saved && !replacing && (
@@ -248,7 +249,7 @@ export function createSettingsCard({ keys, client }: { keys: KeyStore; client: S
           <a href={GET_KEY_URL} target="_blank" rel="noopener noreferrer">
             Get one at app.s1.dev
           </a>{" "}
-          and start with 100 free credits, no credit card required. A search, a news search or a page read costs 1 credit; each search result read in full costs 1 more.
+          and start with 100 free credits, no credit card required. A search, a news search or a page read costs 1 credit, and each search result read in full costs 1 more. A page of up to 20 places from Maps costs 3 credits.
         </p>
         {store === "keychain" ? (
           <p className="s1b-muted">

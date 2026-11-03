@@ -21,7 +21,7 @@ function setup(options: { key?: string | undefined } = {}) {
 describe("the tools Buzz lists for agents", () => {
   test("three tools, named after the plugin, with object schemas Buzz accepts", () => {
     const { tools } = setup();
-    expect(Object.keys(tools)).toEqual(["search1api_search", "search1api_news", "search1api_crawl"]);
+    expect(Object.keys(tools)).toEqual(["search1api_search", "search1api_news", "search1api_crawl", "search1api_maps"]);
     for (const tool of Object.values(tools)) {
       // The same check Buzz makes in AgentsService.addTool.
       expect(tool.name).toMatch(/^[a-z][a-z0-9_]{0,63}$/);
@@ -110,6 +110,28 @@ describe("search1api_crawl", () => {
     const { fake, call } = setup();
     fake.setPage("");
     await expect(call("search1api_crawl", { url: "https://example.com/empty" })).rejects.toThrow("could not read any text");
+  });
+});
+
+describe("search1api_maps", () => {
+  test("posts to /maps with only what the agent set, and keeps places that have a name and link", async () => {
+    const { fake, call } = setup();
+    const reply = await call("search1api_maps", { query: "coffee in Austin", country: "us", max_results: 5 });
+    expect(fake.seen[0]!.url).toBe(`${S1_ORIGIN}/maps`);
+    expect(JSON.parse(fake.seen[0]!.body!)).toEqual({ query: "coffee in Austin", country: "us", max_results: 5 });
+    expect(reply.places.map((p: { name: string }) => p.name)).toEqual(["Fake Coffee"]);
+    expect(reply.places[0]).toMatchObject({ rating: 4.6, review_count: 120, address: "1 Main St" });
+  });
+
+  test("a location is passed through, and later pages need one", async () => {
+    const { fake, call } = setup();
+    await call("search1api_maps", { query: "tacos", page: 2, location: { latitude: 30.27, longitude: -97.74, zoom: 15 } });
+    expect(JSON.parse(fake.seen[0]!.body!)).toEqual({ query: "tacos", page: 2, location: { latitude: 30.27, longitude: -97.74, zoom: 15 } });
+    await expect(call("search1api_maps", { query: "tacos", page: 2 })).rejects.toThrow("location is required");
+    await expect(call("search1api_maps", { query: "tacos", location: { latitude: 200, longitude: 0 } })).rejects.toThrow("location must be");
+    await expect(call("search1api_maps", { query: "tacos", country: "usa" })).rejects.toThrow("country");
+    await expect(call("search1api_maps", { query: "tacos", max_results: 21 })).rejects.toThrow("max_results");
+    expect(fake.seen).toHaveLength(1);
   });
 });
 

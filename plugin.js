@@ -1,7 +1,7 @@
 // src/client.ts
 var S1_ORIGIN = "https://api.search1api.com";
 /** Tells Search1API which integration a request came from. */
-var USER_AGENT = `search1api-buzz/0.1.0`;
+var USER_AGENT = `search1api-buzz/0.2.0`;
 var S1Error = class extends Error {
 	kind;
 	constructor(kind, message) {
@@ -453,7 +453,7 @@ function createSettingsCard({ keys, client }) {
 		return /* @__PURE__ */ React.createElement("section", {
 			className: "s1b-root",
 			"aria-label": "Search1API"
-		}, /* @__PURE__ */ React.createElement("p", null, "Gives every agent in this app Search1API tools: ", /* @__PURE__ */ React.createElement("code", null, "search1api_search"), " to search the live web,", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_news"), " for recent news, and ", /* @__PURE__ */ React.createElement("code", null, "search1api_crawl"), " to read a page in full. They use your own Search1API key, which is kept on this computer and sent only to Search1API."), saved && !replacing && /* @__PURE__ */ React.createElement("p", {
+		}, /* @__PURE__ */ React.createElement("p", null, "Gives every agent in this app Search1API tools: ", /* @__PURE__ */ React.createElement("code", null, "search1api_search"), " to search the live web,", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_news"), " for recent news, ", /* @__PURE__ */ React.createElement("code", null, "search1api_crawl"), " to read a page in full, and", " ", /* @__PURE__ */ React.createElement("code", null, "search1api_maps"), " to find places and businesses on Google Maps. They use your own Search1API key, which is kept on this computer and sent only to Search1API."), saved && !replacing && /* @__PURE__ */ React.createElement("p", {
 			className: "s1b-saved",
 			"data-place": place
 		}, /* @__PURE__ */ React.createElement("strong", null, "Key saved."), " ", place === "keychain" || place === "secret-service" ? `It is kept in ${STORE_NAME[place]}. It is not shown again.` : store ? `It is in this app's profile, as plain text, because ${store === "keychain" ? "the Keychain" : "the system secret store (Secret Service)"} would not take it yet (it is tried again each time Buzz starts). Any other plugin you install could read it. It is not shown again.` : "It is in this app's profile, as plain text, because this system has no secret store the plugin can use: any other plugin you install could read it. It is not shown again."), showInput && /* @__PURE__ */ React.createElement("form", {
@@ -513,7 +513,7 @@ function createSettingsCard({ keys, client }) {
 			href: GET_KEY_URL,
 			target: "_blank",
 			rel: "noopener noreferrer"
-		}, "Get one at app.s1.dev"), " ", "and start with 100 free credits, no credit card required. A search, a news search or a page read costs 1 credit; each search result read in full costs 1 more."), store === "keychain" ? /* @__PURE__ */ React.createElement("p", { className: "s1b-muted" }, "On a Mac the key is kept in your Keychain, in an item named buzz-search1api. Buzz plugins are not sandboxed: a plugin that declares the", " ", /* @__PURE__ */ React.createElement("code", null, "security"), " program could read it too, and its install review lists that. Install only plugins you trust.") : store === "secret-service" ? /* @__PURE__ */ React.createElement("p", { className: "s1b-muted" }, "On Linux the key is kept in the system secret store (gnome-keyring, KWallet or another), in an item with the attributes service buzz-search1api and account search1api. If no Secret Service is running, it is kept in this app's profile as plain text instead, and this card says so. Install only plugins you trust.") : /* @__PURE__ */ React.createElement("p", { className: "s1b-muted" }, "On this system the key is kept in this app's profile, as plain text. Buzz plugins are not sandboxed, so any other plugin you install could read it: install only plugins you trust."));
+		}, "Get one at app.s1.dev"), " ", "and start with 100 free credits, no credit card required. A search, a news search or a page read costs 1 credit, and each search result read in full costs 1 more. A page of up to 20 places from Maps costs 3 credits."), store === "keychain" ? /* @__PURE__ */ React.createElement("p", { className: "s1b-muted" }, "On a Mac the key is kept in your Keychain, in an item named buzz-search1api. Buzz plugins are not sandboxed: a plugin that declares the", " ", /* @__PURE__ */ React.createElement("code", null, "security"), " program could read it too, and its install review lists that. Install only plugins you trust.") : store === "secret-service" ? /* @__PURE__ */ React.createElement("p", { className: "s1b-muted" }, "On Linux the key is kept in the system secret store (gnome-keyring, KWallet or another), in an item with the attributes service buzz-search1api and account search1api. If no Secret Service is running, it is kept in this app's profile as plain text instead, and this card says so. Install only plugins you trust.") : /* @__PURE__ */ React.createElement("p", { className: "s1b-muted" }, "On this system the key is kept in this app's profile, as plain text. Buzz plugins are not sandboxed, so any other plugin you install could read it: install only plugins you trust."));
 	};
 }
 // src/styles.ts
@@ -648,6 +648,17 @@ function requireHttpUrl(args, name) {
 	}
 	if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(`${name} must start with http:// or https://`);
 	return url.toString();
+}
+function optionalLocation(value) {
+	if (value === void 0 || value === null) return void 0;
+	const v = value;
+	const number = (n, min, max) => typeof n === "number" && Number.isFinite(n) && n >= min && n <= max;
+	if (typeof value !== "object" || !number(v.latitude, -90, 90) || !number(v.longitude, -180, 180) || v.zoom !== void 0 && !number(v.zoom, 3, 30)) throw new Error("location must be {latitude: -90..90, longitude: -180..180, zoom?: 3..30}");
+	return defined({
+		latitude: v.latitude,
+		longitude: v.longitude,
+		zoom: v.zoom
+	});
 }
 var defined = (entries) => Object.fromEntries(Object.entries(entries).filter(([, value]) => value !== void 0));
 var sitesSchema = (description) => ({
@@ -788,6 +799,89 @@ function createTools(client) {
 						truncated: true,
 						total_chars: content.length
 					} : {}
+				}, null, 1);
+			}
+		},
+		{
+			name: "search1api_maps",
+			description: "Find local businesses and places on Google Maps with Search1API, when the user asks where something is, wants nearby options, or needs a list of businesses with contact details. Returns JSON with one page of up to 20 places: name and Google Maps link, plus address, phone, website, category, rating, review count, coordinates and opening hours when known. Costs 3 credits per page however many places it holds. Use search1api_search for web pages and search1api_crawl to read a business's website.",
+			inputSchema: {
+				type: "object",
+				properties: {
+					query: {
+						type: "string",
+						maxLength: 1e3,
+						description: "What to look for, such as \"coffee shops\" or \"dentists in Austin\"; a place name in the query sets the area when no location is given"
+					},
+					country: {
+						type: "string",
+						pattern: "^[a-zA-Z]{2}$",
+						description: "Two-letter country code for local results; default us"
+					},
+					language: {
+						type: "string",
+						description: "Result language, such as en, de or zh-CN; default en"
+					},
+					location: {
+						type: "object",
+						description: "Search around this point instead of letting the query decide the area; required for page 2 and later",
+						properties: {
+							latitude: {
+								type: "number",
+								minimum: -90,
+								maximum: 90
+							},
+							longitude: {
+								type: "number",
+								minimum: -180,
+								maximum: 180
+							},
+							zoom: {
+								type: "number",
+								minimum: 3,
+								maximum: 30,
+								description: "Map zoom, higher is a smaller area; default 14"
+							}
+						},
+						required: ["latitude", "longitude"],
+						additionalProperties: false
+					},
+					page: {
+						type: "integer",
+						minimum: 1,
+						maximum: 6,
+						description: "Page to fetch; each page is a separate 3-credit call and pages after the first need location"
+					},
+					max_results: {
+						type: "integer",
+						minimum: 1,
+						maximum: 20,
+						description: "How many places the answer needs; fewer places do not lower the price"
+					}
+				},
+				required: ["query"],
+				additionalProperties: false
+			},
+			async call(_client, _context, args) {
+				const country = args.country;
+				if (country !== void 0 && (typeof country !== "string" || !/^[a-zA-Z]{2}$/.test(country))) throw new Error("country must be a two-letter country code, such as us or de");
+				const language = args.language;
+				if (language !== void 0 && (typeof language !== "string" || !/^[a-z]{2,3}(-[a-zA-Z]{2,4})?$/.test(language))) throw new Error("language must be a language code, such as en, de or zh-CN");
+				const location = optionalLocation(args.location);
+				const page = optionalInt(args, "page", 1, 6);
+				if (page !== void 0 && page > 1 && !location) throw new Error("location is required for page 2 and later");
+				const request = defined({
+					query: requireString(args, "query"),
+					country,
+					language,
+					location,
+					page,
+					max_results: optionalInt(args, "max_results", 1, 20)
+				});
+				const places = ((await client.post("/maps", request, 45e3)).results ?? []).filter((place) => typeof place.name === "string" && typeof place.maps_url === "string").map(({ thumbnail: _thumbnail, ...place }) => place);
+				return JSON.stringify({
+					query: request.query,
+					places
 				}, null, 1);
 			}
 		}

@@ -57,10 +57,10 @@ describe("the built plugin.js", () => {
     expect(plugin.inject).toEqual(["react", "settingsCards", "agents", "host"]);
   });
 
-  test("apply adds the three tools and the settings card, and a style that its cleanup removes", () => {
+  test("apply adds the tools and the settings card, and a style that its cleanup removes", () => {
     const { ctx, tools, cards, cleanups } = loadContext();
     plugin.apply(ctx);
-    expect(tools.map((t) => t.name)).toEqual(["search1api_search", "search1api_news", "search1api_crawl"]);
+    expect(tools.map((t) => t.name)).toEqual(["search1api_search", "search1api_news", "search1api_crawl", "search1api_maps"]);
     expect(cards.map((c) => [c.id, c.title, c.group])).toEqual([["settings", "Search1API", "Plugins"]]);
     expect(cleanups).toHaveLength(1);
   });
